@@ -37,17 +37,21 @@ function Komut($satir) {
 
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-# Zip'i Windows'un kendi aciciyla (.NET) acar; tar.exe'ye guvenmez (Git'in tar'i zip acamaz).
-# Once gecici klasore acar, sonra en ust klasorleri hedefe tasir (varsa eskisini siler).
-function Ac($zip, $hedef) {
+# Zip'i Windows'un kendi aciciyla (.NET) acar. (Not: fonksiyon adi "Ac" OLAMAZ: PowerShell'de "ac" = Add-Content.)
+# Once gecici klasore acar, sonra en ust klasorleri hedefe tasir. Zip bozuksa siler, $url verilmisse bir kez yeniden indirir.
+function ZipAc($zip, $hedef, $url = $null) {
     New-Item -ItemType Directory -Force -Path $hedef | Out-Null
     $gecici = Join-Path $hedef '_acilan'
-    Remove-Item $gecici -Recurse -Force -ErrorAction SilentlyContinue
-    Write-Host "   aciliyor: $([IO.Path]::GetFileName($zip)) ..."
-    try { [IO.Compression.ZipFile]::ExtractToDirectory($zip, $gecici) }
-    catch {
-        Remove-Item $zip -Force -ErrorAction SilentlyContinue
-        Hata "Zip acilamadi ($([IO.Path]::GetFileName($zip))): $($_.Exception.Message) - dosya silindi, tekrar calistirinca yeniden indirilecek."
+    for ($deneme = 1; $deneme -le 2; $deneme++) {
+        Remove-Item $gecici -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "   aciliyor: $([IO.Path]::GetFileName($zip)) ..."
+        try { [IO.Compression.ZipFile]::ExtractToDirectory($zip, $gecici); break }
+        catch {
+            Remove-Item $zip -Force -ErrorAction SilentlyContinue
+            Remove-Item $gecici -Recurse -Force -ErrorAction SilentlyContinue
+            if ($url -and $deneme -eq 1) { Write-Host '   zip bozuk, yeniden indiriliyor...' -ForegroundColor Yellow; Indir $url $zip; continue }
+            Hata "Zip acilamadi ($([IO.Path]::GetFileName($zip))): $($_.Exception.Message)"
+        }
     }
     foreach ($o in Get-ChildItem $gecici) {
         $yer = Join-Path $hedef $o.Name
@@ -75,7 +79,7 @@ Baslik 'Java 17'
 $jdk = JavaBul
 if (-not $jdk) {
     Indir $JdkUrl (Join-Path $Base 'jdk17.zip')
-    Ac (Join-Path $Base 'jdk17.zip') $Base
+    ZipAc (Join-Path $Base 'jdk17.zip') $Base $JdkUrl
     $jdk = JavaBul
     if (-not $jdk) {
         $icerik = (Get-ChildItem $Base | Select-Object -ExpandProperty Name) -join ', '
@@ -93,7 +97,7 @@ if (-not (Test-Path $sdkm)) {
     Indir $CmdUrl (Join-Path $Base 'cmdtools.zip')
     $gecici = Join-Path $Base 'cmd_gecici'
     Remove-Item $gecici -Recurse -Force -ErrorAction SilentlyContinue
-    Ac (Join-Path $Base 'cmdtools.zip') $gecici
+    ZipAc (Join-Path $Base 'cmdtools.zip') $gecici $CmdUrl
     New-Item -ItemType Directory -Force -Path (Join-Path $Sdk 'cmdline-tools') | Out-Null
     Move-Item (Join-Path $gecici 'cmdline-tools') (Join-Path $Sdk 'cmdline-tools\latest')
     Remove-Item $gecici -Recurse -Force
@@ -116,7 +120,7 @@ Baslik 'Gradle'
 $gradle = Join-Path $Base 'gradle-8.11.1\bin\gradle.bat'
 if (-not (Test-Path $gradle)) {
     Indir $GrdUrl (Join-Path $Base 'gradle.zip')
-    Ac (Join-Path $Base 'gradle.zip') $Base
+    ZipAc (Join-Path $Base 'gradle.zip') $Base $GrdUrl
 }
 Write-Host '   tamam'
 
@@ -127,7 +131,7 @@ $kd = Join-Path $Base 'kaynak'
 Remove-Item $kz -Force -ErrorAction SilentlyContinue
 Remove-Item $kd -Recurse -Force -ErrorAction SilentlyContinue
 Indir $Depo $kz
-Ac $kz $kd
+ZipAc $kz $kd $Depo
 $proje = Join-Path $kd 'jarvis-mobil-main\android'
 if (-not (Test-Path $proje)) { Hata 'Kodda android klasoru yok' }
 Write-Host '   tamam'
