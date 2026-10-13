@@ -61,8 +61,7 @@ fun IzinSihirbazi(bitti: () -> Unit) {
         return
     }
 
-    @Suppress("UNUSED_EXPRESSION") tetik
-    val tamam = adim.tamamMi(ctx)
+    val tamam = tetik >= 0 && adim.tamamMi(ctx)   // tetik okunur: ayardan dönünce durum yeniden hesaplanır
 
     Box(Modifier.fillMaxSize().background(UzayZemin).padding(24.dp)) {
         Column(Modifier.fillMaxWidth().align(Alignment.TopCenter)) {

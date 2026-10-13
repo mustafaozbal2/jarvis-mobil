@@ -1,6 +1,5 @@
 package com.mustafa.jarvis.ui
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -31,6 +30,6 @@ private val renkler = darkColorScheme(
 
 @Composable
 fun JarvisTema(icerik: @Composable () -> Unit) {
-    @Suppress("UNUSED_EXPRESSION") isSystemInDarkTheme()   // JARVIS daima koyu
+    // JARVIS daima koyu tema kullanır (sistem açık temada olsa bile)
     MaterialTheme(colorScheme = renkler, typography = Typography(), content = icerik)
 }
