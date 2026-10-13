@@ -35,10 +35,32 @@ function Komut($satir) {
     return $LASTEXITCODE
 }
 
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+# Zip'i Windows'un kendi aciciyla (.NET) acar; tar.exe'ye guvenmez (Git'in tar'i zip acamaz).
+# Once gecici klasore acar, sonra en ust klasorleri hedefe tasir (varsa eskisini siler).
 function Ac($zip, $hedef) {
     New-Item -ItemType Directory -Force -Path $hedef | Out-Null
-    & tar.exe -xf $zip -C $hedef
-    if ($LASTEXITCODE -ne 0) { Hata "Acilamadi: $zip" }
+    $gecici = Join-Path $hedef '_acilan'
+    Remove-Item $gecici -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Host "   aciliyor: $([IO.Path]::GetFileName($zip)) ..."
+    try { [IO.Compression.ZipFile]::ExtractToDirectory($zip, $gecici) }
+    catch {
+        Remove-Item $zip -Force -ErrorAction SilentlyContinue
+        Hata "Zip acilamadi ($([IO.Path]::GetFileName($zip))): $($_.Exception.Message) - dosya silindi, tekrar calistirinca yeniden indirilecek."
+    }
+    foreach ($o in Get-ChildItem $gecici) {
+        $yer = Join-Path $hedef $o.Name
+        if (Test-Path $yer) { Remove-Item $yer -Recurse -Force }
+        Move-Item $o.FullName $yer
+    }
+    Remove-Item $gecici -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# Icinde bin\java.exe olan klasoru bulur (ismi ne olursa olsun)
+function JavaBul {
+    Get-ChildItem $Base -Directory -ErrorAction SilentlyContinue |
+        Where-Object { Test-Path (Join-Path $_.FullName 'bin\java.exe') } | Select-Object -First 1
 }
 
 Write-Host '   ___  ___  ______   _____ _____'   -ForegroundColor Cyan
@@ -50,12 +72,15 @@ Write-Host '\____/\_| |_/\_| \_|  \___/\____/  MOBIL - APK DERLEYICI' -Foregroun
 
 # ---------- 1) Java 17 ----------
 Baslik 'Java 17'
-$jdk = Get-ChildItem $Base -Directory -Filter 'jdk-17*' -ErrorAction SilentlyContinue | Select-Object -First 1
+$jdk = JavaBul
 if (-not $jdk) {
     Indir $JdkUrl (Join-Path $Base 'jdk17.zip')
     Ac (Join-Path $Base 'jdk17.zip') $Base
-    $jdk = Get-ChildItem $Base -Directory -Filter 'jdk-17*' | Select-Object -First 1
-    if (-not $jdk) { Hata 'Java klasoru bulunamadi' }
+    $jdk = JavaBul
+    if (-not $jdk) {
+        $icerik = (Get-ChildItem $Base | Select-Object -ExpandProperty Name) -join ', '
+        Hata "Java klasoru bulunamadi. android_araclar icinde olanlar: $icerik"
+    }
 }
 $env:JAVA_HOME = $jdk.FullName
 $env:Path = "$($jdk.FullName)\bin;$env:Path"
