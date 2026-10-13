@@ -1,0 +1,23 @@
+# —— Sırlar: ASLA yüklenmez ——
+.env
+*.env
+data/
+src/jarvis/kimlik_gizli.json
+
+# —— Python ——
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# —— Android / Gradle ——
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/captures/
+*.iml
+
+# NOT: android/app/jarvis.keystore BİLEREK yüklenir (her derlemede aynı imza gerekiyor).
+# Bu yüzden depo GİZLİ (private) olmalı. jarvis.keystore'u .gitignore'a EKLEME.

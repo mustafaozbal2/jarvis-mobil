@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">JARVIS</string>
+    <string name="duvar_adi">JARVIS Nebula</string>
+    <string name="duvar_aciklama">Yaşayan Nebula: JARVIS\'in çekirdeği ana ekranında nefes alır.</string>
+</resources>
