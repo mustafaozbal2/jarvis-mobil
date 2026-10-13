@@ -9,7 +9,7 @@ APK'yı **senin bilgisayarında Android Studio kurmadan**, GitHub'ın sunucular�
 2. **Yeni bir depo (repository) oluştur.**
    - Sağ üstte **+** → **New repository**.
    - İsim: `jarvis` (ne istersen).
-   - **Önemli:** **Private** (gizli) seç. Çünkü imza anahtarı (`app/jarvis.keystore`) depoda duruyor.
+   - Depo herkese açık olabilir: imza anahtarı şifreli, şifresi yalnızca GitHub gizli değerinde (`JARVIS_KEYSTORE_SIFRE`).
    - **Create repository.**
 3. **Dosyaları yükle.**
    - Depoda **Add file → Upload files**.

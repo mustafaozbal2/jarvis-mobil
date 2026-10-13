@@ -30,11 +30,20 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
+      - name: İmza şifresi var mı?
+        env:
+          JARVIS_KEYSTORE_SIFRE: ${{ secrets.JARVIS_KEYSTORE_SIFRE }}
+        run: |
+          if [ -z "$JARVIS_KEYSTORE_SIFRE" ]; then
+            echo "::error::JARVIS_KEYSTORE_SIFRE gizli değeri tanımlı değil. Settings → Secrets and variables → Actions → New repository secret."
+            exit 1
+          fi
+
       - name: APK derle (release)
         working-directory: android
         run: gradle assembleRelease --no-daemon --stacktrace
         env:
-          # İstersen depo ayarlarında "JARVIS_KEYSTORE_SIFRE" adlı gizli değer tanımla; yoksa varsayılan kullanılır.
+          # İmza şifresi: depo ayarlarındaki "JARVIS_KEYSTORE_SIFRE" gizli değeri (zorunlu).
           JARVIS_KEYSTORE_SIFRE: ${{ secrets.JARVIS_KEYSTORE_SIFRE }}
 
       - name: APK'yı yükle

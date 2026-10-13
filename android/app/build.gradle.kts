@@ -19,13 +19,15 @@ android {
     }
 
     // Her derlemede AYNI anahtarla imzalanır: telefona yeni sürüm kurulunca eskisinin üzerine yazılır (kaldırmak gerekmez).
-    // GitHub'da JARVIS_KEYSTORE_SIFRE gizli değeri tanımlıysa o şifre kullanılır.
+    // Depo herkese açık: anahtar dosyası güçlü şifreyle kilitli, şifre YALNIZCA GitHub gizli değerinde
+    // (Settings → Secrets and variables → Actions → JARVIS_KEYSTORE_SIFRE). Şifresiz dosya işe yaramaz.
+    val ksSifre = System.getenv("JARVIS_KEYSTORE_SIFRE").orEmpty()
     signingConfigs {
         create("jarvis") {
             storeFile = file("jarvis.keystore")
-            storePassword = System.getenv("JARVIS_KEYSTORE_SIFRE") ?: "jarvis-mobil"
+            storePassword = ksSifre
             keyAlias = "jarvis"
-            keyPassword = System.getenv("JARVIS_KEYSTORE_SIFRE") ?: "jarvis-mobil"
+            keyPassword = ksSifre
         }
     }
 
