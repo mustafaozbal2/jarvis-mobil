@@ -70,7 +70,11 @@ fun AyarlarEkrani(sihirbaziAc: () -> Unit, geri: () -> Unit, haber: (String) -> 
             }) { Text("‹ Kaydet ve dön", color = NebulaYesil, fontSize = 16.sp) }
         }
         Baslik("Bilgisayar")
-        Alan("Adres (https://....trycloudflare.com)", pcAdres) { pcAdres = it }
+        Alan("Bağlantıyı buraya yapıştır (https://....trycloudflare.com/?t=...)", pcAdres) { yeni ->
+            // Tam bağlantı yapıştırıldıysa adresi ve anahtarı kendimiz ayırırız
+            val ayri = baglantiAyir(yeni)
+            if (ayri != null) { pcAdres = ayri.first; pcAnahtar = ayri.second } else { pcAdres = yeni }
+        }
         Alan("Telefon anahtarı (token)", pcAnahtar) { pcAnahtar = it }
         Dugme("Anahtarları bilgisayardan al") {
             Depo.yaz(Depo.PC_ADRES, pcAdres.trim()); Depo.yaz(Depo.PC_ANAHTAR, pcAnahtar.trim())
@@ -151,4 +155,10 @@ fun AyarlarEkrani(sihirbaziAc: () -> Unit, geri: () -> Unit, haber: (String) -> 
         Text(t, color = Color.White, fontSize = 15.sp, modifier = Modifier.weight(1f))
         Switch(checked = acik, onCheckedChange = degis)
     }
+}
+
+/** "https://x.trycloudflare.com/?t=ANAHTAR" → ("https://x.trycloudflare.com", "ANAHTAR"); bağlantı değilse null. */
+internal fun baglantiAyir(metin: String): Pair<String, String>? {
+    val m = Regex("""(https?://[^/?#\s]+)[^\s]*?[?&]t=([A-Za-z0-9_\-]+)""").find(metin.trim()) ?: return null
+    return m.groupValues[1] to m.groupValues[2]
 }
