@@ -22,7 +22,7 @@ class BildirimDinleyici : NotificationListenerService() {
         val baslik = e.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
         val metin = (e.getCharSequence(Notification.EXTRA_BIG_TEXT) ?: e.getCharSequence(Notification.EXTRA_TEXT))?.toString().orEmpty()
         if (baslik.isBlank() && metin.isBlank()) return
-        if (sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+        if ((sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0) return
         val etiket = try {
             packageManager.getApplicationLabel(packageManager.getApplicationInfo(sbn.packageName, 0)).toString()
         } catch (_: Exception) { sbn.packageName }

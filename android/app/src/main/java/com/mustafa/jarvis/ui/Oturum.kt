@@ -29,9 +29,12 @@ class Oturum(
     private val konusma: Konusma,
     private val dinleme: Dinleme,
 ) {
-    var hal by mutableStateOf(Hal.BEKLEME); private set
-    var altyazi by mutableStateOf(""); private set
-    var enerji by mutableStateOf(0.15f); private set
+    var hal by mutableStateOf(Hal.BEKLEME)
+        private set
+    var altyazi by mutableStateOf("")
+        private set
+    var enerji by mutableStateOf(0.15f)
+        private set
     val gecmis = mutableStateListOf<Mesaj>()
 
     private var is_: Job? = null

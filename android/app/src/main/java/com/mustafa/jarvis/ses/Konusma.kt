@@ -61,7 +61,7 @@ class Konusma(private val ctx: Context) {
         val dosya = File(ctx.cacheDir, "jarvis_ses_${System.nanoTime()}")
         return try {
             dosya.writeBytes(veri)
-            suspendCancellableCoroutine { dev ->
+            suspendCancellableCoroutine<Boolean> { dev ->
                 val mp = MediaPlayer()
                 oynatici = mp
                 mp.setDataSource(dosya.absolutePath)
@@ -86,7 +86,7 @@ class Konusma(private val ctx: Context) {
         var bekle = 0
         while (!hazir && bekle < 30) { kotlinx.coroutines.delay(100); bekle++ }
         if (!hazir || benim != surum) return
-        suspendCancellableCoroutine { dev ->
+        suspendCancellableCoroutine<Unit> { dev ->
             val id = "j$benim"
             motor.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {}

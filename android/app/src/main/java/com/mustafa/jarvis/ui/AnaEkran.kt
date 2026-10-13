@@ -21,6 +21,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -121,14 +123,12 @@ fun AnaEkran(
 
 @Composable
 private fun MetinDugme(yazi: String, tikla: () -> Unit) {
-    Surface(
-        color = Color.White.copy(alpha = 0.10f),
-        shape = RoundedCornerShape(20.dp),
-        onClick = tikla
-    ) {
-        Text(
-            yazi, color = Color.White, fontSize = 14.sp,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-        )
-    }
+    Text(
+        yazi, color = Color.White, fontSize = 14.sp,
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White.copy(alpha = 0.10f))
+            .clickable(onClick = tikla)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    )
 }
