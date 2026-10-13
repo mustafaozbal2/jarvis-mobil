@@ -56,6 +56,9 @@ fun AyarlarEkrani(sihirbaziAc: () -> Unit, geri: () -> Unit, haber: (String) -> 
     var openai by remember { mutableStateOf(Depo.al(Depo.OPENAI)) }
     var jarvisSes by remember { mutableStateOf(Depo.al(Depo.SES, "jarvis") == "jarvis") }
     var arkaDinle by remember { mutableStateOf(!Depo.bayrak(Depo.UYANMA)) }
+    var pin by remember { mutableStateOf("") }
+    var durum by remember { mutableStateOf("") }
+    var mesgul by remember { mutableStateOf(false) }
 
     Column(
         Modifier.fillMaxSize().background(UzayZemin).verticalScroll(rememberScrollState()).padding(16.dp)
@@ -70,20 +73,59 @@ fun AyarlarEkrani(sihirbaziAc: () -> Unit, geri: () -> Unit, haber: (String) -> 
             }) { Text("‹ Kaydet ve dön", color = NebulaYesil, fontSize = 16.sp) }
         }
         Baslik("Bilgisayar")
-        Alan("Bağlantıyı buraya yapıştır (https://....trycloudflare.com/?t=...)", pcAdres) { yeni ->
+        Not("Bilgisayarda \"Jarvis, telefonu bağla\" de. Sohbet penceresinde çıkan adresi ve 6 haneli kodu buraya yaz. " +
+            "Ya da tam bağlantıyı (…/?t=…) yapıştır; kod gerekmez.")
+        Alan("Adres ya da tam bağlantı (https://….trycloudflare.com)", pcAdres) { yeni ->
             // Tam bağlantı yapıştırıldıysa adresi ve anahtarı kendimiz ayırırız
             val ayri = baglantiAyir(yeni)
             if (ayri != null) { pcAdres = ayri.first; pcAnahtar = ayri.second } else { pcAdres = yeni }
         }
-        Alan("Telefon anahtarı (token)", pcAnahtar) { pcAnahtar = it }
-        Dugme("Anahtarları bilgisayardan al") {
-            Depo.yaz(Depo.PC_ADRES, pcAdres.trim()); Depo.yaz(Depo.PC_ANAHTAR, pcAnahtar.trim())
-            kapsam.launch {
-                val s = Sarjor.anahtarlariAl()
-                gemini = Depo.al(Depo.GEMINI); groq = Depo.al(Depo.GROQ)
-                claude = Depo.al(Depo.CLAUDE); openai = Depo.al(Depo.OPENAI)
-                haber(s)
+        if (pcAnahtar.isBlank()) {
+            Alan("Eşleşme kodu (6 hane)", pin) { pin = it.filter { c -> c.isDigit() }.take(6) }
+        } else {
+            Not("✓ Bu telefonun bilgisayar anahtarı var.")
+        }
+        Dugme(if (mesgul) "Bağlanıyor…" else "Bağlan ve anahtarları al") {
+            val adres = pcAdres.trim().trimEnd('/')
+            if (mesgul) {
+                // zaten çalışıyor
+            } else if (!adres.startsWith("http")) {
+                durum = "Adres https:// ile başlamalı efendim. Bilgisayardaki sohbet penceresinden kopyala."
+            } else if (pcAnahtar.isBlank() && pin.length != 6) {
+                durum = "Bilgisayardaki 6 haneli eşleşme kodunu yaz, ya da tam bağlantıyı yapıştır."
+            } else {
+                mesgul = true
+                durum = "Bilgisayara bağlanıyorum…"
+                kapsam.launch {
+                    var tamam = true
+                    if (pcAnahtar.isBlank()) {
+                        val (ok, sonuc) = Sarjor.esles(adres, pin)
+                        if (ok) { pcAnahtar = sonuc; pin = "" } else { durum = sonuc; tamam = false }
+                    }
+                    if (tamam) {
+                        pcAdres = adres
+                        Depo.yaz(Depo.PC_ADRES, adres); Depo.yaz(Depo.PC_ANAHTAR, pcAnahtar.trim())
+                        val s = Sarjor.anahtarlariAl()
+                        gemini = Depo.al(Depo.GEMINI); groq = Depo.al(Depo.GROQ)
+                        claude = Depo.al(Depo.CLAUDE); openai = Depo.al(Depo.OPENAI)
+                        durum = s
+                        haber(s)
+                    }
+                    mesgul = false
+                }
             }
+        }
+        if (durum.isNotBlank()) {
+            Surface(color = NebulaYesil.copy(alpha = 0.12f), shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                Text(durum, color = Color.White, fontSize = 14.sp, modifier = Modifier.padding(12.dp))
+            }
+        }
+        if (pcAnahtar.isNotBlank()) {
+            TextButton(onClick = {
+                pcAnahtar = ""; Depo.yaz(Depo.PC_ANAHTAR, ""); Sarjor.sifirla()
+                durum = "Bilgisayar bağlantısı silindi. Yeniden bağlanmak için adres ve yeni kodu gir."
+            }) { Text("Bilgisayar bağlantısını sıfırla", color = Soluk, fontSize = 13.sp) }
         }
 
         Baslik("Yapay zekâ anahtarları (elle)")

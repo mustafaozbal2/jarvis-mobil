@@ -33,16 +33,32 @@ object Sarjor {
         .build()
     private val gecmis = ArrayDeque<Mesaj>()
 
+    /** Bilgisayardaki JARVIS'e: kısa bağlantı süresi (kapalıysa çabuk vazgeç). */
+    private val pcHttp: OkHttpClient = http.newBuilder().connectTimeout(4, TimeUnit.SECONDS).readTimeout(45, TimeUnit.SECONDS).build()
+
+    /** Bilgisayar ulaşılamazsa bu zamana kadar hiç denenmez (her soruda boşuna beklemesin). */
+    @Volatile private var pcAtlaBitis = 0L
+
     fun sistem(): String =
         "Senin adın JARVIS: zeki, sıcak, zarif ve yer yer esprili, kadın sesiyle konuşan kişisel bir yapay zekâ asistanısın. " +
             "Telefonun içinde yaşıyorsun. Kullanıcıya 'efendim' diye hitap et; 'patron', 'kaptan' gibi lakaplar ASLA kullanma. " +
             "Cevapların sesli okunur: kısa, doğal Türkçe (çoğu zaman 1-3 cümle), madde/başlık/emoji kullanma. " +
             "Bilmediğini uydurma. Bir işi yapmadıysan yaptım deme."
 
-    fun siradakiler(): List<String> {
+    /** Bilgisayardaki JARVIS'e özgü işler: bunlarda bilgisayar ÖNCE denenir; normal sohbette en sona kalır (hız). */
+    private val PC_ISI = Regex(
+        "bilgisayar|laptop|\\bpc\\b|masaüstü|masa üstü|ekran|dosya|klasör|belge|word|excel|powerpoint|sunum|" +
+            "chrome|youtube'?(u|da)? aç|indir|kaydet|hatırla|hatırlat|takvim|whatsapp'?(tan|a)? (yaz|gönder)|teşhis|kapat",
+        RegexOption.IGNORE_CASE
+    )
+
+    fun siradakiler(metin: String = ""): List<String> {
         val sira = Depo.al(Depo.SARJOR, "groq,gemini,claude,openai").split(",").map { it.trim() }.filter { it.isNotEmpty() }
         val out = mutableListOf<String>()
-        if (Depo.al(Depo.PC_ADRES).isNotEmpty() && Depo.al(Depo.PC_ANAHTAR).isNotEmpty()) out.add("pc")
+        val pcVar = Depo.al(Depo.PC_ADRES).isNotEmpty() && Depo.al(Depo.PC_ANAHTAR).isNotEmpty() &&
+            System.currentTimeMillis() > pcAtlaBitis
+        val pcOnce = pcVar && (misafirMi() || PC_ISI.containsMatchIn(metin))
+        if (pcOnce) out.add("pc")
         for (ad in sira) {
             val var_ = when (ad) {
                 "groq" -> Depo.al(Depo.GROQ).isNotEmpty()
@@ -53,11 +69,12 @@ object Sarjor {
             }
             if (var_ && ad !in out) out.add(ad)
         }
+        if (pcVar && "pc" !in out) out.add("pc")      // yedek: diğerleri olmazsa bilgisayar
         return out
     }
 
     suspend fun sor(metin: String): Cevap = withContext(Dispatchers.IO) {
-        val sira = siradakiler()
+        val sira = siradakiler(metin)
         if (sira.isEmpty()) {
             return@withContext Cevap(
                 "Henüz bir beynim yok efendim. Ayarlardan bilgisayarla eşleş ya da bir yapay zekâ anahtarı ekle.", "yok"
@@ -83,14 +100,18 @@ object Sarjor {
                 }
             } catch (e: Exception) {
                 son = e
+                // Bilgisayar kapalı / adres değişmiş: 5 dk boyunca atla, doğrudan yapay zekâya git
+                if (ad == "pc" && (e !is SaglayiciHatasi || e.kod >= 500 || e.kod == 404)) {
+                    pcAtlaBitis = System.currentTimeMillis() + 5 * 60_000L
+                }
             }
         }
         val neden = (son as? SaglayiciHatasi)?.let { if (it.kod == 429) "kotalar dolu" else "hata ${it.kod}" } ?: "internete ulaşılamadı"
         Cevap("Şu an hiçbir beyne ulaşamadım efendim ($neden). Biraz sonra yeniden dener misin?", "hata")
     }
 
-    private fun gonder(istek: Request): JSONObject {
-        http.newCall(istek).execute().use { r ->
+    private fun gonder(istek: Request, istemci: OkHttpClient = http): JSONObject {
+        istemci.newCall(istek).execute().use { r ->
             val govde = r.body?.string() ?: ""
             if (!r.isSuccessful) throw SaglayiciHatasi(r.code, govde.take(200))
             return JSONObject(govde)
@@ -109,14 +130,14 @@ object Sarjor {
                 .header("X-Jarvis-Token", anahtar)
                 .post(JSONObject().put("metin", metin).put("gecmis", g).toString().toRequestBody(JSON_TUR))
                 .build()
-            return gonder(istek).optString("metin")
+            return gonder(istek, pcHttp).optString("metin")
         }
         val istek = Request.Builder()
             .url(Depo.al(Depo.PC_ADRES).trimEnd('/') + "/api/komut")
             .header("X-Jarvis-Token", anahtar)
             .post(JSONObject().put("metin", metin).toString().toRequestBody(JSON_TUR))
             .build()
-        return gonder(istek).optString("cevap")
+        return gonder(istek, pcHttp).optString("cevap")
     }
 
     /** V13 misafir anahtarları "m_" ile başlar. */
@@ -205,23 +226,46 @@ object Sarjor {
             Depo.yaz(Depo.SARJOR, j.optString("sarjor", "groq,gemini,claude,openai"))
             "Anahtarlar alındı efendim: ${siradakiler().filter { it != "pc" }.joinToString(" → ")}. Bilgisayar kapalıyken de konuşabilirim."
         } catch (e: SaglayiciHatasi) {
-            if (e.kod == 403 || e.kod == 401) "Bu telefon misafir ya da anahtar geçersiz; anahtarları yalnızca sahibin telefonu alabilir."
+            if (e.kod == 401) "Anahtar geçersiz efendim. \"Bilgisayar bağlantısını sıfırla\"ya bas, bilgisayarda yeniden \"telefonu bağla\" de ve yeni kodla eşleş."
+            else if (e.kod == 403) "Bu telefon misafir olarak bağlı; anahtarları yalnızca sahibin telefonu alabilir."
             else "Bilgisayardan alamadım (hata ${e.kod})."
         } catch (e: Exception) {
-            "Bilgisayara ulaşamadım. JARVIS açık mı ve telefon bağlantısı açık mı?"
+            "Bilgisayara ulaşamadım. Bilgisayarda JARVIS açık mı? Adres her açılışta değişir: \"telefonu bağla\" deyip yeni adresi gir."
+        }
+    }
+
+    /** 6 haneli kodla eşleşir. (true, anahtar) ya da (false, Türkçe hata). */
+    suspend fun esles(adres: String, pin: String): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        try {
+            val istek = Request.Builder().url(adres.trimEnd('/') + "/api/esle")
+                .post(JSONObject().put("pin", pin).toString().toRequestBody(JSON_TUR)).build()
+            pcHttp.newCall(istek).execute().use { r ->
+                val g = r.body?.string() ?: ""
+                val j = try { JSONObject(g) } catch (_: Exception) { JSONObject() }
+                if (r.isSuccessful && j.optString("t").isNotEmpty()) {
+                    pcAtlaBitis = 0L
+                    true to j.optString("t")
+                } else {
+                    false to (j.optString("hata").ifEmpty { "Bilgisayar eşleşmeyi kabul etmedi (hata ${r.code})." })
+                }
+            }
+        } catch (e: Exception) {
+            false to "Bilgisayara ulaşamadım. Adresi doğru yazdın mı? Bilgisayarda JARVIS ve telefon bağlantısı açık mı?"
         }
     }
 
     /** Bilgisayardaki JARVIS'in sesiyle okutmak için MP3/WAV baytları; olmazsa null. */
     suspend fun pcSesi(metin: String): ByteArray? = withContext(Dispatchers.IO) {
-        if (Depo.al(Depo.PC_ADRES).isEmpty()) return@withContext null
+        if (Depo.al(Depo.PC_ADRES).isEmpty() || Depo.al(Depo.PC_ANAHTAR).isEmpty()
+            || System.currentTimeMillis() < pcAtlaBitis) return@withContext null
         try {
             val istek = Request.Builder()
                 .url(Depo.al(Depo.PC_ADRES).trimEnd('/') + "/api/ses")
                 .header("X-Jarvis-Token", Depo.al(Depo.PC_ANAHTAR))
                 .post(JSONObject().put("metin", metin.take(700)).toString().toRequestBody(JSON_TUR)).build()
-            http.newCall(istek).execute().use { r -> if (r.code == 200) r.body?.bytes() else null }
+            pcHttp.newCall(istek).execute().use { r -> if (r.code == 200) r.body?.bytes() else null }
         } catch (e: Exception) {
+            pcAtlaBitis = System.currentTimeMillis() + 5 * 60_000L   // bilgisayar yok: 5 dk telefonun kendi sesi
             null
         }
     }

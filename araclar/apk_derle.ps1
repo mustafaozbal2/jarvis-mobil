@@ -16,6 +16,14 @@ $CmdUrl = 'https://dl.google.com/android/repository/commandlinetools-win-1107670
 $GrdUrl = 'https://services.gradle.org/distributions/gradle-8.11.1-bin.zip'
 New-Item -ItemType Directory -Force -Path $Base | Out-Null
 
+# 14.2: HER SEY D'de kalsin. Gradle onbellegi (~2 GB), Android ayarlari ve gecici dosyalar C:'yi doldurmasin.
+$GTmp = Join-Path $Base 'tmp'
+New-Item -ItemType Directory -Force -Path $GTmp | Out-Null
+$env:GRADLE_USER_HOME  = Join-Path $Base 'gradle_ev'
+$env:ANDROID_USER_HOME = Join-Path $Base 'android_ev'
+$env:TEMP = $GTmp; $env:TMP = $GTmp
+$env:GRADLE_OPTS = "-Djava.io.tmpdir=$GTmp"
+
 function Baslik($t) { Write-Host ''; Write-Host "==> $t" -ForegroundColor Green }
 function Hata($t) { Write-Host ''; Write-Host "HATA: $t" -ForegroundColor Red; Read-Host 'Kapatmak icin Enter'; exit 1 }
 
@@ -73,6 +81,23 @@ Write-Host '    | / /_\ \| |_/ / | | | \ `--.'   -ForegroundColor Cyan
 Write-Host '    | |  _  ||    /  | | | |`--. \'  -ForegroundColor Cyan
 Write-Host '/\__/ / | | || |\ \  \ \_/ /\__/ /'  -ForegroundColor Cyan
 Write-Host '\____/\_| |_/\_| \_|  \___/\____/  MOBIL - APK DERLEYICI' -ForegroundColor Cyan
+
+# ---------- 0) C: diskindeki eski Gradle onbellegi (onceki surum buraya yaziyordu) ----------
+$eskiGradle = Join-Path $env:USERPROFILE '.gradle'
+if ((Test-Path $eskiGradle) -and -not (Test-Path (Join-Path $Base 'c_temizlendi.txt'))) {
+    $gb = [math]::Round(((Get-ChildItem $eskiGradle -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum) / 1GB, 2)
+    if ($gb -ge 0.2) {
+        Baslik "C: diskinde eski derleme onbellegi var ($gb GB): $eskiGradle"
+        Write-Host '   Bu derleyici artik her seyi D: diskinde tutuyor. Eskisini silmek C: diskine yer acar.'
+        Write-Host '   (Android Studio kullaniyorsan da sorun degil; gerekirse kendisi yeniden indirir.)'
+        $c = (Read-Host '   Silinsin mi? (E/H)').Trim().ToUpper()
+        if ($c -eq 'E' -or $c -eq 'EVET') {
+            Remove-Item $eskiGradle -Recurse -Force -ErrorAction SilentlyContinue
+            Write-Host "   silindi: $gb GB yer acildi." -ForegroundColor Green
+        }
+    }
+    Set-Content (Join-Path $Base 'c_temizlendi.txt') 'soruldu'
+}
 
 # ---------- 1) Java 17 ----------
 Baslik 'Java 17'
